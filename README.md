@@ -7,6 +7,8 @@
 
 > A blazing fast, zero-bloat, and security-first Bitwarden / Vaultwarden overlay for **Omarchy Shell** on Hyprland.
 
+> **Fork notice:** this is a security-hardened fork of [icyleaf/omarchy-bitwarden](https://github.com/icyleaf/omarchy-bitwarden) (MIT). On top of upstream it applies: account email / API client_id removed from plugin logs, access token redacted from interactive `auth` CLI output, panic fix for servers reporting 2FA with an empty provider list, quote-escaping in the release-notes rich-text renderer, and an origin allowlist for update-check release URLs. Full credit for the project goes to the original author; see `LICENSE`.
+
 Powered by a dedicated pure Rust engine (`omawarden`), `omarchy-bitwarden` delivers sub-millisecond credential lookups, minimal memory overhead, and rigorous process isolation—designed from the ground up to replace heavy Electron apps and sluggish Node CLI tooling with a native, Spotlight-style keyboard workflow.
 
 ![Preview](preview.png)
