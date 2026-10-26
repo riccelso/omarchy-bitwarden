@@ -27,6 +27,10 @@ Item {
   property color foreground: "#ffffff"
   property color accent: "#3b82f6"
   property color borderColor: Qt.rgba(1, 1, 1, 0.1)
+  // Referenced by the submit-button label and the install hint; without this
+  // declaration both bindings evaluate to undefined ("Unable to assign
+  // [undefined] to QColor") and the disabled label loses its color.
+  property color muted: Qt.darker(foreground, 1.8)
   property string fontFamily: ""
 
   readonly property string curServerUrl: (authServerUrlInput && authServerUrlInput.text.trim()) ? authServerUrlInput.text.trim() : ((config && config.server_url) ? config.server_url : "")
