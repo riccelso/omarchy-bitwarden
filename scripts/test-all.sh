@@ -46,11 +46,15 @@ STANDALONE_TESTS=(
 export QML_IMPORT_PATH="${ROOT_DIR}/tests/stubs${QML_IMPORT_PATH:+:${QML_IMPORT_PATH}}"
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}"
 
-for test_file in "${STANDALONE_TESTS[@]}"; do
-  if [ -f "$test_file" ]; then
-    echo "Running $test_file..."
-    qml6 "$test_file"
-  fi
-done
+if ! command -v qml6 >/dev/null 2>&1; then
+  echo "qml6 not found in PATH; skipping standalone QML tests." >&2
+else
+  for test_file in "${STANDALONE_TESTS[@]}"; do
+    if [ -f "$test_file" ]; then
+      echo "Running $test_file..."
+      qml6 "$test_file"
+    fi
+  done
+fi
 
 echo "=== All Tests Passed Successfully ==="
