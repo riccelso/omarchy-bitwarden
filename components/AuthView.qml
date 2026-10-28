@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Dialogs
 import qs.Commons
 import "IconPolicy.js" as IconPolicy
 
@@ -22,6 +23,9 @@ Item {
   property int emailSentCount: 0
   property bool isSendingEmail: false
   property bool isInstalling: false
+  // ADR-0025: true when the engine reports quick unlock is enabled and a
+  // soft-locked key is retained; shows the system-authentication button.
+  property bool quickUnlockAvailable: false
   property bool showServerConfig: false
   property bool enableMtlsChecked: false
   property color foreground: "#ffffff"
@@ -52,6 +56,7 @@ Item {
   }
 
   signal unlockRequested(string password)
+  signal quickUnlockRequested()
   signal loginPasswordRequested(string email, string password, string code, var provider)
   signal loginApiKeyRequested(string clientId, string clientSecret)
   signal logoutRequested()
@@ -258,6 +263,7 @@ Item {
                   font.pixelSize: Style.font.body
                   echoMode: TextInput.Password
                   selectByMouse: true
+                  clip: true
                   activeFocusOnTab: true
                   onAccepted: {
                     if (text.trim()) {
@@ -277,6 +283,29 @@ Item {
                   visible: !unlockPasswordField.text
                 }
               }
+            }
+          }
+
+          // Quick Unlock Button (ADR-0025): system authentication instead of
+          // the master password after a soft lock.
+          Rectangle {
+            Layout.fillWidth: true
+            height: 32
+            radius: 5
+            visible: authRoot.quickUnlockAvailable && !authRoot.isBusy
+            color: Qt.rgba(1, 1, 1, 0.08)
+
+            Text {
+              anchors.centerIn: parent
+              text: "Unlock with System Authentication"
+              color: authRoot.foreground
+              font.pixelSize: Style.font.body
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.PointingHandCursor
+              onClicked: authRoot.quickUnlockRequested()
             }
           }
 
@@ -432,6 +461,7 @@ Item {
                     id: authServerUrlInput
                     anchors.left: parent.left; anchors.right: parent.right; anchors.leftMargin: 10; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
                     color: authRoot.foreground; font.family: "sans-serif"; font.pixelSize: Style.font.body; selectByMouse: true
+                    clip: true
                     activeFocusOnTab: true
                     KeyNavigation.tab: (!authRoot.isOfficialServer && authRoot.enableMtlsChecked && authClientCertInput) ? authClientCertInput : ((authRoot.loginMethod === "password") ? loginEmailInput : apiClientIdInput)
                     KeyNavigation.backtab: (authRoot.loginMethod === "password") ? (authRoot.show2FAField ? login2FAInput : loginPwdInput) : apiClientSecInput
@@ -500,19 +530,31 @@ Item {
                     Layout.fillWidth: true; height: 32; radius: 5; color: Qt.rgba(0, 0, 0, 0.25); border.color: authClientCertInput.activeFocus ? authRoot.accent : authRoot.borderColor; border.width: 1
                     TextInput {
                       id: authClientCertInput
-                      anchors.left: parent.left; anchors.right: parent.right; anchors.leftMargin: 10; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
+                      anchors.left: parent.left; anchors.right: authCertBrowseBtn.left; anchors.leftMargin: 10; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter
                       color: authRoot.foreground; font.family: "sans-serif"; font.pixelSize: Style.font.body; selectByMouse: true
+                      clip: true
                       activeFocusOnTab: true
                       KeyNavigation.tab: authClientKeyInput
                       KeyNavigation.backtab: authServerUrlInput
                       text: authRoot.certMatchesServer ? ((authRoot.config && authRoot.config.client_cert_path) || "") : ""
                     }
                     Text {
-                      anchors.left: parent.left; anchors.leftMargin: 10; anchors.verticalCenter: parent.verticalCenter
+                      anchors.left: parent.left; anchors.right: authCertBrowseBtn.left; anchors.leftMargin: 10; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter
                       text: "e.g. /home/user/.certs/client.crt"
                       color: Qt.darker(authRoot.foreground, 2.0)
                       font.family: "sans-serif"; font.pixelSize: Style.font.body
+                      elide: Text.ElideRight
                       visible: authClientCertInput.text.length === 0
+                    }
+                    GhostIconButton {
+                      id: authCertBrowseBtn
+                      anchors.right: parent.right
+                      anchors.rightMargin: 5
+                      anchors.verticalCenter: parent.verticalCenter
+                      iconText: "\uf07b"
+                      fontFamily: authRoot.fontFamily
+                      tooltip: "Browse certificate file"
+                      onClicked: authCertFileDialog.open()
                     }
                   }
                 }
@@ -526,20 +568,52 @@ Item {
                     Layout.fillWidth: true; height: 32; radius: 5; color: Qt.rgba(0, 0, 0, 0.25); border.color: authClientKeyInput.activeFocus ? authRoot.accent : authRoot.borderColor; border.width: 1
                     TextInput {
                       id: authClientKeyInput
-                      anchors.left: parent.left; anchors.right: parent.right; anchors.leftMargin: 10; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
+                      anchors.left: parent.left; anchors.right: authKeyBrowseBtn.left; anchors.leftMargin: 10; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter
                       color: authRoot.foreground; font.family: "sans-serif"; font.pixelSize: Style.font.body; selectByMouse: true
+                      clip: true
                       activeFocusOnTab: true
                       KeyNavigation.tab: (authRoot.loginMethod === "password") ? loginEmailInput : apiClientIdInput
                       KeyNavigation.backtab: authClientCertInput
                       text: authRoot.certMatchesServer ? ((authRoot.config && authRoot.config.client_key_path) || "") : ""
                     }
                     Text {
-                      anchors.left: parent.left; anchors.leftMargin: 10; anchors.verticalCenter: parent.verticalCenter
+                      anchors.left: parent.left; anchors.right: authKeyBrowseBtn.left; anchors.leftMargin: 10; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter
                       text: "e.g. /home/user/.certs/client.key (0600 mode)"
                       color: Qt.darker(authRoot.foreground, 2.0)
                       font.family: "sans-serif"; font.pixelSize: Style.font.body
+                      elide: Text.ElideRight
                       visible: authClientKeyInput.text.length === 0
                     }
+                    GhostIconButton {
+                      id: authKeyBrowseBtn
+                      anchors.right: parent.right
+                      anchors.rightMargin: 5
+                      anchors.verticalCenter: parent.verticalCenter
+                      iconText: "\uf07b"
+                      fontFamily: authRoot.fontFamily
+                      tooltip: "Browse private key file"
+                      onClicked: authKeyFileDialog.open()
+                    }
+                  }
+                }
+
+                FileDialog {
+                  id: authCertFileDialog
+                  title: "Select Client Certificate (.pem / .crt)"
+                  fileMode: FileDialog.OpenFile
+                  nameFilters: ["Certificate files (*.crt *.pem)", "All files (*)"]
+                  onAccepted: {
+                    authClientCertInput.text = IconPolicy.urlToLocalPath(selectedFile)
+                  }
+                }
+
+                FileDialog {
+                  id: authKeyFileDialog
+                  title: "Select Client Private Key (.key / .pem)"
+                  fileMode: FileDialog.OpenFile
+                  nameFilters: ["Private key files (*.key *.pem)", "All files (*)"]
+                  onAccepted: {
+                    authClientKeyInput.text = IconPolicy.urlToLocalPath(selectedFile)
                   }
                 }
 
@@ -668,6 +742,7 @@ Item {
                   id: loginEmailInput
                   anchors.left: parent.left; anchors.right: parent.right; anchors.leftMargin: 10; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
                   color: authRoot.foreground; font.family: "sans-serif"; font.pixelSize: Style.font.body; selectByMouse: true
+                  clip: true
                   activeFocusOnTab: true
                   KeyNavigation.tab: loginPwdInput
                   KeyNavigation.backtab: authRoot.showServerConfig
@@ -689,6 +764,7 @@ Item {
                   id: loginPwdInput
                   anchors.left: parent.left; anchors.right: parent.right; anchors.leftMargin: 10; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
                   color: authRoot.foreground; font.family: "sans-serif"; font.pixelSize: Style.font.body; echoMode: TextInput.Password; selectByMouse: true
+                  clip: true
                   activeFocusOnTab: true
                   KeyNavigation.tab: (authRoot.show2FAField && authRoot.twoFactorProvider !== 7)
                     ? login2FAInput
@@ -975,6 +1051,7 @@ Item {
                     anchors.rightMargin: resendEmailBtn.visible ? 6 : 10
                     anchors.verticalCenter: parent.verticalCenter
                     color: authRoot.foreground; font.family: "sans-serif"; font.pixelSize: Style.font.body; selectByMouse: true
+                    clip: true
                     activeFocusOnTab: true
                     KeyNavigation.tab: authRoot.showServerConfig ? authServerUrlInput : loginEmailInput
                     KeyNavigation.backtab: loginPwdInput
@@ -1131,6 +1208,7 @@ Item {
                   id: apiClientIdInput
                   anchors.left: parent.left; anchors.right: parent.right; anchors.leftMargin: 10; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
                   color: authRoot.foreground; font.family: "sans-serif"; font.pixelSize: Style.font.body; selectByMouse: true
+                  clip: true
                   activeFocusOnTab: true
                   KeyNavigation.tab: apiClientSecInput
                   KeyNavigation.backtab: authRoot.showServerConfig
@@ -1151,6 +1229,7 @@ Item {
                   id: apiClientSecInput
                   anchors.left: parent.left; anchors.right: parent.right; anchors.leftMargin: 10; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
                   color: authRoot.foreground; font.family: "sans-serif"; font.pixelSize: Style.font.body; echoMode: TextInput.Password; selectByMouse: true
+                  clip: true
                   activeFocusOnTab: true
                   KeyNavigation.tab: authRoot.showServerConfig ? authServerUrlInput : apiClientIdInput
                   KeyNavigation.backtab: apiClientIdInput
