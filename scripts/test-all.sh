@@ -37,6 +37,7 @@ STANDALONE_TESTS=(
   "tests/tst_mtls_ui_gating.qml"
   "tests/tst_input_clipping.qml"
   "tests/tst_settings_ssh_agent.qml"
+  "tests/tst_quick_unlock_gating.qml"
   "tests/tst_ssh_approval_modal.qml"
 )
 
